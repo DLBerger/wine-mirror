@@ -1,6 +1,6 @@
-# RFC: Win16 Support in Wine (wow16loader)
+# RFC: Win16 Support in Wine (win16vdm)
 
-**Status:** Draft / Prototype  
+**Status:** Draft / Personal fork prototype  
 **Date:** 2026-04-15  
 **Author:** DLBerger  
 **Target branch:** master
@@ -29,9 +29,9 @@ Win32/Win64 host APIs.  However otvdm re-implements large parts of what Wine alr
 provides (loader, thunking, USER/GDI dispatch, wineserver IPC patterns, etc.), leading to
 duplicated effort and divergent quality.
 
-This RFC proposes a path to add **first-class, maintained Win16 support to Wine itself**,
-reusing existing Wine components wherever possible, following Wine coding conventions, and
-buildable on every platform Wine supports.
+This RFC proposes a path for a **personal fork prototype** to add Win16 support in a
+Wine-shaped way, reusing existing Wine components wherever possible and following Wine
+coding conventions.
 
 ---
 
@@ -168,7 +168,7 @@ RFC proposes using Wine's existing layer instead.
 NE binary
     │
     ▼
-wow16loader (new program)
+win16vdm (new program)
     │  loads NE, sets up address space
     │
     ▼
@@ -184,12 +184,12 @@ Wine 32-bit / 64-bit layer (ntdll, win32u, wineserver, …)
 ```
 
 **How it works:**  
-`wow16loader` is a new Wine program (`programs/wow16loader/`) that:
+`win16vdm` is a new Wine program (`programs/win16vdm/`) that:
 1. Parses the NE header to determine the entry point and import table.
 2. Maps NE segments into a memory region managed by an embedded x86 emulator.
 3. Starts the emulator, letting it execute 16-bit code.
 4. When the 16-bit code issues a far call to a system DLL entry point, the emulator's
-   "undefined opcode / INT" intercept fires, and `wow16loader` routes the call through
+   "undefined opcode / INT" intercept fires, and `win16vdm` routes the call through
    Wine's existing `krnl386`/`user.exe16` ABI (already compiled as 32-bit built-ins).
 
 **Pros:**
@@ -265,13 +265,13 @@ Wine is available.  Option C is deferred as a long-term research direction.
 ## 8. Proposed Component Boundaries and Naming
 
 ```
-programs/wow16loader/          – New Wine program (launcher + NE parser + emulator glue)
+programs/win16vdm/             – New Wine program (launcher + NE parser + emulator glue)
     Makefile.in
-    README.md                  – Points to this RFC; marks directory as stub
-    wow16loader.c              – (stub) main entry point
-    wow16loader.spec           – (stub) winebuild spec
+    README.md                     – Points to this RFC; marks directory as stub
+    win16vdm.c              – (stub) main entry point
+    win16vdm.spec           – (stub) winebuild spec
 
-dlls/wow16support/             – (future) helper library shared between wow16loader and
+dlls/wow16support/             – (future) helper library shared between win16vdm and
                                   existing krnl386 thunking; currently empty
     Makefile.in
     README.md
@@ -284,11 +284,63 @@ dlls/gdi.exe16/                – Existing; no changes planned initially
 ```
 
 **Naming rationale:**
-* `wow16loader` mirrors Wine's `winevdm` naming pattern (functional description, not a
+* `win16vdm` mirrors Wine's `winevdm` naming pattern (functional description, not a
   Windows internal name).
 * Placing new code under `programs/` follows the pattern of `winevdm`, `winedbg`, etc.
 * `wow16support` is reserved in `dlls/` for future shared logic; not wired into the build
   until meaningful code exists.
+
+### 8.1 Local-use process model and manifest discovery
+
+For this personal fork prototype, `win16vdm` uses **one helper process per Win16 app**.
+
+Manifest discovery (Option 1A + filename convention A):
+1. Given `X:\path\MYAPP.EXE`, probe `X:\path\MYAPP.win16vdm.xml`.
+2. If present and valid XML, apply manifest settings.
+3. If absent, run with defaults only:
+   * no explicit DLL name→hash bindings,
+   * default cache root (`%LOCALAPPDATA%\win16vdm\cache`),
+   * normal Wine path handling for anything not pinned by manifest.
+
+This fallback keeps the prototype usable without requiring a manifest for every test app.
+
+### 8.2 Minimal manifest schema outline (prototype)
+
+The schema is intentionally small and local-use only:
+
+```xml
+<win16vdm app="MYAPP.EXE" version="1">
+  <cache root="%LOCALAPPDATA%\\win16vdm\\cache" override="optional-fixed-path"/>
+  <modules>
+    <module name="KERNEL" version="3.10.0" sha256="..."/>
+    <module name="USER"   version="3.10.0" sha256="..."/>
+  </modules>
+</win16vdm>
+```
+
+Initial rules:
+* `app` identifies the target executable name for sanity checking.
+* `<cache root=...>` defaults to `%LOCALAPPDATA%\win16vdm\cache`.
+* `override` may set a fixed cache directory when explicitly requested in manifest.
+* `<module>` binds logical Win16 module name to exact content hash (and optional version).
+
+### 8.3 Shared DLL cache design (content-addressed, side-by-side)
+
+The shared cache is content-addressed and per-user by default:
+
+```
+%LOCALAPPDATA%\win16vdm\cache\
+    <sha256>\KERNEL.DLL16
+    <sha256>\USER.DLL16
+```
+
+Design properties:
+* **Hash-keyed storage** deduplicates identical binaries safely.
+* **Manifest binding** (`name` + optional `version` -> `sha256`) selects exact module
+  content for each app.
+* **Side-by-side versions** of the same module name can coexist (avoids DLL hell).
+* Future optimization may memory-map cached DLL images read-only to improve cross-process
+  sharing while keeping one `win16vdm` process per app.
 
 ---
 
@@ -298,7 +350,7 @@ dlls/gdi.exe16/                – Existing; no changes planned initially
 
 * New directories follow the existing pattern: a `Makefile.in` in each subdirectory,
   referenced from the top-level `configure.ac` / `Makefile.in`.
-* The component is **optional**: add a `--enable-wow16` / `--disable-wow16` autoconf
+* The component is **optional**: add a `--enable-win16vdm` / `--disable-win16vdm` autoconf
   option (defaulting to `auto`, which enables if the emulator library is detected).
 * No changes to existing `Makefile.in` files until the component is ready to build.
 
@@ -316,7 +368,7 @@ The dependency should be:
 
 ### 9.3 MSVC friendliness
 
-Wine is primarily a GCC/Clang codebase.  MSVC support is partial.  For `wow16loader`:
+Wine is primarily a GCC/Clang codebase.  MSVC support is partial.  For `win16vdm`:
 * Use only C99/C11 constructs found elsewhere in Wine (no GCC extensions beyond those
   already used in `krnl386`).
 * Avoid `__attribute__((packed))` in favour of `#pragma pack` (already used in
@@ -360,7 +412,7 @@ expected exit code**.
 
 ### 10.4 Regression baseline
 
-Before wiring `wow16loader` into the build, run `make test` against the existing Win16
+Before wiring `win16vdm` into the build, run `make test` against the existing Win16
 test suite (`dlls/krnl386.exe16/tests/`) to establish a baseline.  No regressions are
 acceptable in that suite.
 
@@ -379,7 +431,7 @@ acceptable in that suite.
 
 ### 11.2 Privilege separation
 
-* `wow16loader` is a normal Wine user-space process; it does not require elevated
+* `win16vdm` is a normal Wine user-space process; it does not require elevated
   privileges.
 * The emulator should not be permitted to issue system calls directly; all OS interaction
   must flow through the Wine thunk chain.
@@ -403,17 +455,17 @@ acceptable in that suite.
 
 ### Milestone 0 – Scaffolding (this PR)
 
-* [x] Add `programs/wow16loader/README.md` (stub, points here).
-* [x] Add `programs/wow16loader/Makefile.in` (stub, not wired into build).
+* [x] Add `programs/win16vdm/README.md` (stub, points here).
+* [x] Add `programs/win16vdm/Makefile.in` (stub, not wired into build).
 * [x] Add `documentation/rfc-win16-support.md` (this document).
 
 ### Milestone 1 – NE Parser
 
 * [ ] Implement NE header / segment table / import name table parser in
-      `programs/wow16loader/ne_parse.c`.
+      `programs/win16vdm/ne_parse.c`.
 * [ ] Add unit tests for the parser.
-* [ ] Wire `wow16loader` into the build system as an optional target
-      (`--enable-wow16`).
+* [ ] Wire `win16vdm` into the build system as an optional target
+      (`--enable-win16vdm`).
 
 ### Milestone 2 – Emulator Integration
 
@@ -458,27 +510,25 @@ acceptable in that suite.
    core under `libs/` acceptable?
 
 2. **krnl386.exe16 on 64-bit:** What is the long-term plan for krnl386 on 64-bit Wine?
-   Should `wow16loader` extend krnl386 or maintain a parallel Win16 personality?
+   Should `win16vdm` extend krnl386 or maintain a parallel Win16 personality?
 
 3. **LDT access on 64-bit Linux:** The LDT is still accessible via `modify_ldt(2)` on
    Linux x86-64 for user-space code.  Is it acceptable to rely on this for segment
    simulation, or should the design avoid LDT use entirely?
 
-4. **Process model:** Should each Win16 task run as a separate Wine process (like modern
-   winevdm/winedbg), or should multiple Win16 tasks share a process (matching original
-   Windows 3.1 cooperative multitasking)?
+4. **Process model:** For this personal-fork prototype, use one `win16vdm` process per
+   Win16 app.  Revisit shared-process mode only after compatibility is established.
 
-5. **WoW64 interaction:** On x86-64 Linux with 32-bit multilib, should `wow16loader`
+5. **WoW64 interaction:** On x86-64 Linux with 32-bit multilib, should `win16vdm`
    detect that 32-bit Wine is available and delegate to the existing krnl386 path
    (Option B as a fast path)?
 
-6. **Naming:** The Wine project may have preferences for naming (`wow16loader` vs.
-   `ntvdm16` vs. `win16host`); what is preferred?
+6. **Naming:** This fork uses `win16vdm` for now; upstream naming can be revisited later.
 
 7. **Licence for emulator backend:** Unicorn is LGPL; libx86emu is MIT.  Does Wine's
    licence policy accept either?
 
-8. **Build system:** Should the optional component use autoconf `--enable-wow16` or a
+8. **Build system:** Should the optional component use autoconf `--enable-win16vdm` or a
    separate `configure` sub-invocation (like `wine64` / `wine32` split today)?
 
 ---

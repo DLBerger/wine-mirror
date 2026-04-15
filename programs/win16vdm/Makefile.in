@@ -1,0 +1,13 @@
+MODULE    = win16vdm.exe
+
+# Stub: not yet wired into the top-level build.
+# See programs/win16vdm/README.md and documentation/rfc-win16-support.md.
+#
+# When ready, add the following to the parent Makefile.in SUBDIRS list:
+#   programs/win16vdm
+# and update configure.ac with an --enable-win16vdm option.
+
+EXTRADLLFLAGS = -mconsole
+
+SOURCES = \
+	win16vdm.c

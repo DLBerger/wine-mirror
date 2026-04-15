@@ -1,5 +1,5 @@
 /*
- * wow16loader - Win16 (NE) application loader stub
+ * win16vdm - Win16 (NE) application loader stub
  *
  * Copyright 2026 Contributors
  *
@@ -28,19 +28,19 @@
 #include "winbase.h"
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(wow16loader);
+WINE_DEFAULT_DEBUG_CHANNEL(win16vdm);
 
 int __cdecl wmain( int argc, WCHAR *argv[] )
 {
-    FIXME( "wow16loader is not yet implemented\n" );
+    FIXME( "win16vdm is not yet implemented\n" );
     FIXME( "See documentation/rfc-win16-support.md for the design RFC\n" );
 
     if (argc < 2)
     {
-        fprintf( stderr, "Usage: wow16loader <ne-executable> [args...]\n" );
+        fprintf( stderr, "Usage: win16vdm <ne-executable> [args...]\n" );
         return 1;
     }
 
-    fprintf( stderr, "wow16loader: not yet supported\n" );
+    fprintf( stderr, "win16vdm: not yet supported\n" );
     return 1;
 }
