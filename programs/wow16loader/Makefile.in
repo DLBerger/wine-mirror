@@ -1,0 +1,13 @@
+MODULE    = wow16loader.exe
+
+# Stub: not yet wired into the top-level build.
+# See programs/wow16loader/README.md and documentation/rfc-win16-support.md.
+#
+# When ready, add the following to the parent Makefile.in SUBDIRS list:
+#   programs/wow16loader
+# and update configure.ac with an --enable-wow16 option.
+
+EXTRADLLFLAGS = -mconsole
+
+SOURCES = \
+	wow16loader.c
