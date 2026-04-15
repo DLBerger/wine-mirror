@@ -267,7 +267,7 @@ Wine is available.  Option C is deferred as a long-term research direction.
 ```
 programs/win16vdm/             – New Wine program (launcher + NE parser + emulator glue)
     Makefile.in
-    README.md                     – Points to this RFC; marks directory as stub
+    README.md                  – Points to this RFC; marks directory as stub
     win16vdm.c              – (stub) main entry point
     win16vdm.spec           – (stub) winebuild spec
 
@@ -310,7 +310,7 @@ The schema is intentionally small and local-use only:
 
 ```xml
 <win16vdm app="MYAPP.EXE" version="1">
-  <cache root="%LOCALAPPDATA%\\win16vdm\\cache" override="optional-fixed-path"/>
+  <cache root="%LOCALAPPDATA%\win16vdm\cache" override="optional-fixed-path"/>
   <modules>
     <module name="KERNEL" version="3.10.0" sha256="..."/>
     <module name="USER"   version="3.10.0" sha256="..."/>

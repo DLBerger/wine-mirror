@@ -12,7 +12,7 @@ format) applications. The current prototype direction is one `win16vdm` process 
 Win16 app, with per-app manifest discovery from the executable directory:
 
 * Manifest path: `<exe-name>.win16vdm.xml` next to the Win16 executable.
-* Default shared cache: `%LOCALAPPDATA%\\win16vdm\\cache`.
+* Default shared cache: `%LOCALAPPDATA%\win16vdm\cache`.
 * Manifest may override the cache root to a fixed directory.
 
 ## Current status
